@@ -70,7 +70,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
         refreshCompleted = true;
       });
 
-      Future.delayed(Duration(seconds: 2), () {
+      Future.delayed(const Duration(seconds: 2), () {
         setState(() {
           refreshCompleted = false;
         });
@@ -89,7 +89,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Playlist'),
+        title: const Text('Playlist'),
       ),
       body: RefreshIndicator(
         onRefresh: () async {
