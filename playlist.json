@@ -1,0 +1,16 @@
+{
+  "songs": [
+    {
+      "songName": "Şarkı Adı 1",
+      "songURL": "https://example.com/song1.mp3"
+    },
+    {
+      "songName": "Şarkı Adı 2",
+      "songURL": "https://example.com/song2.mp3"
+    },
+    {
+      "songName": "Şarkı Adı 3",
+      "songURL": "https://example.com/song3.mp3"
+    }
+  ]
+}
