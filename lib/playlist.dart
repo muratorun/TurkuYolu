@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
+import 'package:pull_to_refresh/pull_to_refresh.dart';
 
 void main() {
   runApp(MyApp());
@@ -27,26 +26,24 @@ class _PlaylistPageState extends State<PlaylistPage> {
   @override
   void initState() {
     super.initState();
-    fetchAndUpdatePlaylist(); // Uygulama başladığında verileri güncelle
+    fetchAndUpdatePlaylist();
   }
 
   Future<void> fetchAndUpdatePlaylist() async {
-    final response = await http.get(
-      Uri.parse(
-          'https://raw.githubusercontent.com/muratorun/TurkuYolu/main/playlist.json'),
-    );
+    // Verileri çekme işlemi
+    // ...
 
-    if (response.statusCode == 200) {
-      final jsonData = json.decode(response.body);
-      final updatedPlaylist =
-          List<Map<String, dynamic>>.from(jsonData['songs']);
+    setState(() {
+      // Verileri güncelleme işlemi
+    });
+  }
 
-      setState(() {
-        playlist = updatedPlaylist;
-      });
-    } else {
-      throw Exception('Failed to load playlist data');
-    }
+  RefreshController _refreshController =
+      RefreshController(initialRefresh: false);
+
+  void _onRefresh() async {
+    await fetchAndUpdatePlaylist();
+    _refreshController.refreshCompleted();
   }
 
   @override
@@ -55,16 +52,21 @@ class _PlaylistPageState extends State<PlaylistPage> {
       appBar: AppBar(
         title: Text('Playlist'),
       ),
-      body: ListView.builder(
-        itemCount: playlist.length,
-        itemBuilder: (context, index) {
-          final song = playlist[index];
-          return ListTile(
-            title: Text(song['songName']),
-            // Burada şarkıyı çalmak için gerekli işlevi çağırabilirsiniz.
-            // Örneğin, onPressed ile bir fonksiyonu çağırarak müziği çalabilirsiniz.
-          );
-        },
+      body: SmartRefresher(
+        controller: _refreshController,
+        enablePullDown: true,
+        onRefresh: _onRefresh,
+        child: ListView.builder(
+          itemCount: playlist.length,
+          itemBuilder: (context, index) {
+            final song = playlist[index];
+            return ListTile(
+              title: Text(song['songName']),
+              // Müziği çalmak için gereken işlevi burada çağırabilirsiniz.
+              // Örneğin, onPressed ile bir fonksiyonu çağırarak müziği çalabilirsiniz.
+            );
+          },
+        ),
       ),
     );
   }
