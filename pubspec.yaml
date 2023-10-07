@@ -12,6 +12,9 @@ dependencies:
   flutter:
     sdk: flutter
 
+  # flutter_sound: 9.2.13
+  just_audio: 0.9.35
+
   http: ^1.1.0
 
   pull_to_refresh: ^2.0.0
