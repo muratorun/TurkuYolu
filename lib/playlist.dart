@@ -2,6 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
+void main() {
+  runApp(MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Music Player',
+      home: PlaylistPage(),
+    );
+  }
+}
+
 class PlaylistPage extends StatefulWidget {
   @override
   _PlaylistPageState createState() => _PlaylistPageState();
@@ -13,10 +27,10 @@ class _PlaylistPageState extends State<PlaylistPage> {
   @override
   void initState() {
     super.initState();
-    fetchPlaylistData();
+    fetchAndUpdatePlaylist(); // Uygulama başladığında verileri güncelle
   }
 
-  Future<void> fetchPlaylistData() async {
+  Future<void> fetchAndUpdatePlaylist() async {
     final response = await http.get(
       Uri.parse(
           'https://raw.githubusercontent.com/muratorun/TurkuYolu/main/playlist.json'),
@@ -24,8 +38,11 @@ class _PlaylistPageState extends State<PlaylistPage> {
 
     if (response.statusCode == 200) {
       final jsonData = json.decode(response.body);
+      final updatedPlaylist =
+          List<Map<String, dynamic>>.from(jsonData['songs']);
+
       setState(() {
-        playlist = List<Map<String, dynamic>>.from(jsonData['songs']);
+        playlist = updatedPlaylist;
       });
     } else {
       throw Exception('Failed to load playlist data');
