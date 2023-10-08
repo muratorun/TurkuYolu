@@ -30,23 +30,52 @@ class _PlaylistPageState extends State<PlaylistPage> {
   bool isRefreshing = false;
   bool refreshCompleted = false;
   final AudioPlayer audioPlayer = AudioPlayer();
-  String currentlyPlayingSong = ""; // Boş bir metin olarak başlatın
-  int currentlyPlayingIndex = -1; // Şu an çalınan şarkının indeksi
-  Duration songDuration = Duration.zero;
-  Duration songPosition = Duration.zero;
+  String? currentlyPlayingSong;
+  Duration? songDuration;
+  bool _isPlaying = false;
+  double _sliderValue = 0.0;
+  Duration _currentPosition = Duration.zero;
 
   @override
   void initState() {
     super.initState();
     fetchAndUpdatePlaylist();
+    setupAudioPlayer();
+  }
+
+  void setupAudioPlayer() {
+    audioPlayer.durationStream.listen((Duration? duration) {
+      if (duration != null) {
+        setState(() {
+          songDuration = duration;
+        });
+      }
+    });
+
+    audioPlayer.positionStream.listen((Duration position) {
+      setState(() {
+        _currentPosition = position;
+        _sliderValue = position.inMilliseconds.toDouble();
+      });
+    });
+  }
+
+  String _printDuration(Duration duration) {
+    String twoDigits(int n) {
+      if (n >= 10) return "$n";
+      return "0$n";
+    }
+
+    String twoDigitMinutes = twoDigits(duration.inMinutes.remainder(60));
+    String twoDigitSeconds = twoDigits(duration.inSeconds.remainder(60));
+    return "${twoDigits(duration.inHours)}:$twoDigitMinutes:$twoDigitSeconds";
   }
 
   Future<void> fetchAndUpdatePlaylist() async {
     try {
       final response = await http.get(
         Uri.parse(
-          'https://raw.githubusercontent.com/muratorun/TurkuYolu/main/playlist.json',
-        ),
+            'https://raw.githubusercontent.com/muratorun/TurkuYolu/main/playlist.json'),
       );
 
       if (response.statusCode == 200) {
@@ -92,132 +121,6 @@ class _PlaylistPageState extends State<PlaylistPage> {
     }
   }
 
-  Widget _buildPlayerControls() {
-    return Column(
-      children: [
-        SizedBox(height: 20),
-        if (currentlyPlayingSong
-            .isNotEmpty) // Şarkı çalınıyorsa süre bilgilerini göster
-          Column(
-            children: [
-              Text(
-                currentlyPlayingSong, // Şarkının adını göster
-                style: TextStyle(
-                  fontSize: 18.0,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  IconButton(
-                    icon: Icon(Icons.skip_previous),
-                    iconSize: 36.0,
-                    onPressed: () async {
-                      try {
-                        if (currentlyPlayingIndex == 0) {
-                          // Eğer listenin başındaysa, son şarkıya git
-                          currentlyPlayingIndex = playlist.length - 1;
-                        } else {
-                          // Değilse, bir önceki şarkıya git
-                          currentlyPlayingIndex--;
-                        }
-
-                        final prevSong = playlist[currentlyPlayingIndex];
-                        final audioUrl = prevSong['songURL'] as String;
-                        await audioPlayer.setAudioSource(
-                            AudioSource.uri(Uri.parse(audioUrl)));
-                        await audioPlayer.play();
-
-                        setState(() {
-                          currentlyPlayingSong = prevSong['songName'];
-                          songDuration = audioPlayer.duration ?? Duration.zero;
-                          songPosition = Duration.zero;
-                        });
-                      } catch (error) {
-                        print('Hata oluştu: $error');
-                      }
-                    },
-                  ),
-                  StreamBuilder<PlayerState>(
-                    stream: audioPlayer.playerStateStream,
-                    builder: (context, snapshot) {
-                      final playerState = snapshot.data;
-                      if (playerState?.playing == true) {
-                        return IconButton(
-                          icon: Icon(Icons.pause),
-                          iconSize: 48.0,
-                          onPressed: () {
-                            audioPlayer.pause();
-                          },
-                        );
-                      } else if (playerState?.playing == false) {
-                        return IconButton(
-                          icon: Icon(Icons.play_arrow),
-                          iconSize: 48.0,
-                          onPressed: () {
-                            audioPlayer.play();
-                          },
-                        );
-                      } else {
-                        return SizedBox();
-                      }
-                    },
-                  ),
-                  IconButton(
-                    icon: Icon(Icons.skip_next),
-                    iconSize: 36.0,
-                    onPressed: () async {
-                      try {
-                        if (currentlyPlayingIndex == playlist.length - 1) {
-                          // Eğer listenin sonundayız, başa dön
-                          currentlyPlayingIndex = 0;
-                        } else {
-                          // Değilse, bir sonraki şarkıya git
-                          currentlyPlayingIndex++;
-                        }
-
-                        final nextSong = playlist[currentlyPlayingIndex];
-                        final audioUrl = nextSong['songURL'] as String;
-                        await audioPlayer.setAudioSource(
-                            AudioSource.uri(Uri.parse(audioUrl)));
-                        await audioPlayer.play();
-
-                        setState(() {
-                          currentlyPlayingSong = nextSong['songName'];
-                          songDuration = audioPlayer.duration ?? Duration.zero;
-                          songPosition = Duration.zero;
-                        });
-                      } catch (error) {
-                        print('Hata oluştu: $error');
-                      }
-                    },
-                  ),
-                ],
-              ),
-              SizedBox(height: 8),
-              Slider(
-                value: songPosition.inSeconds.toDouble(),
-                onChanged: (double value) {
-                  audioPlayer.seek(Duration(seconds: value.toInt()));
-                },
-                min: 0,
-                max: songDuration.inSeconds.toDouble(),
-              ),
-              SizedBox(height: 8),
-              Text(
-                '${songPosition.inMinutes}:${(songPosition.inSeconds % 60).toString().padLeft(2, '0')} / ${songDuration.inMinutes}:${(songDuration.inSeconds % 60).toString().padLeft(2, '0')}',
-                style: TextStyle(
-                  fontSize: 18.0,
-                ),
-              ),
-            ],
-          ),
-      ],
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -235,7 +138,8 @@ class _PlaylistPageState extends State<PlaylistPage> {
                 itemCount: playlist.length,
                 itemBuilder: (context, index) {
                   final song = playlist[index];
-                  final isCurrentlyPlaying = index == currentlyPlayingIndex;
+                  final isCurrentlyPlaying =
+                      song['songName'] == currentlyPlayingSong;
 
                   return ListTile(
                     title: Text(
@@ -253,16 +157,14 @@ class _PlaylistPageState extends State<PlaylistPage> {
                         await audioPlayer.setAudioSource(
                             AudioSource.uri(Uri.parse(audioUrl)));
                         await audioPlayer.play();
-                        setState(() {
-                          currentlyPlayingSong = song['songName'];
-                          currentlyPlayingIndex =
-                              index; // Yeni çalınan şarkının indeksini güncelle
-                          songDuration = audioPlayer.duration ?? Duration.zero;
-                          songPosition = Duration.zero;
-                        });
                       } catch (error) {
                         print('Hata oluştu: $error');
                       }
+
+                      setState(() {
+                        currentlyPlayingSong = song['songName'];
+                        _isPlaying = true;
+                      });
                       print('Şarkı çalınıyor: ${song['songName']}');
                     },
                   );
@@ -273,6 +175,70 @@ class _PlaylistPageState extends State<PlaylistPage> {
           _buildPlayerControls(),
         ],
       ),
+    );
+  }
+
+  Widget _buildPlayerControls() {
+    return Column(
+      children: [
+        Slider(
+          value: _sliderValue,
+          onChanged: (newValue) {
+            audioPlayer.seek(Duration(milliseconds: newValue.toInt()));
+          },
+          min: 0.0,
+          max: songDuration?.inMilliseconds.toDouble() ?? 1.0,
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                _printDuration(_currentPosition),
+                style: TextStyle(fontSize: 16.0),
+              ),
+              Text(
+                _printDuration(songDuration ?? Duration.zero),
+                style: TextStyle(fontSize: 16.0),
+              ),
+            ],
+          ),
+        ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            IconButton(
+              icon: Icon(Icons.skip_previous),
+              onPressed: () {
+                // Önceki şarkıya gitmek için gerekli kodu buraya ekleyin
+              },
+              iconSize: 48.0,
+            ),
+            IconButton(
+              icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow),
+              onPressed: () {
+                if (_isPlaying) {
+                  audioPlayer.pause();
+                } else {
+                  audioPlayer.play();
+                }
+                setState(() {
+                  _isPlaying = !_isPlaying;
+                });
+              },
+              iconSize: 64.0,
+            ),
+            IconButton(
+              icon: Icon(Icons.skip_next),
+              onPressed: () {
+                // Sonraki şarkıya gitmek için gerekli kodu buraya ekleyin
+              },
+              iconSize: 48.0,
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
