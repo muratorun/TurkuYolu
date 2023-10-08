@@ -4,10 +4,12 @@ import 'dart:convert';
 import 'package:just_audio/just_audio.dart';
 
 void main() {
-  runApp(MyApp());
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
+  const MyApp({Key? key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -15,12 +17,14 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: PlaylistPage(),
+      home: const PlaylistPage(),
     );
   }
 }
 
 class PlaylistPage extends StatefulWidget {
+  const PlaylistPage({Key? key});
+
   @override
   _PlaylistPageState createState() => _PlaylistPageState();
 }
@@ -57,6 +61,22 @@ class _PlaylistPageState extends State<PlaylistPage> {
         _currentPosition = position;
         _sliderValue = position.inMilliseconds.toDouble();
       });
+    });
+
+    audioPlayer.playerStateStream.listen((PlayerState playerState) async {
+      if (playerState.playing) {
+        setState(() {
+          _isPlaying = true;
+        });
+      } else {
+        setState(() {
+          _isPlaying = false;
+        });
+      }
+      if (playerState.processingState == ProcessingState.completed) {
+        // Şarkı tamamlandıysa sıradaki şarkıyı çal
+        await _playNextSong();
+      }
     });
   }
 
@@ -121,6 +141,40 @@ class _PlaylistPageState extends State<PlaylistPage> {
     }
   }
 
+  Future<void> _playPreviousSong() async {
+    final currentIndex =
+        playlist.indexWhere((song) => song['songName'] == currentlyPlayingSong);
+    if (currentIndex > 0) {
+      final previousSong = playlist[currentIndex - 1];
+      await _playSong(previousSong);
+    }
+  }
+
+  Future<void> _playNextSong() async {
+    final currentIndex =
+        playlist.indexWhere((song) => song['songName'] == currentlyPlayingSong);
+    if (currentIndex < playlist.length - 1) {
+      final nextSong = playlist[currentIndex + 1];
+      await _playSong(nextSong);
+    }
+  }
+
+  Future<void> _playSong(Map<String, dynamic> song) async {
+    try {
+      final audioUrl = song['songURL'] as String;
+      await audioPlayer.setAudioSource(AudioSource.uri(Uri.parse(audioUrl)));
+      await audioPlayer.play();
+    } catch (error) {
+      print('Hata oluştu: $error');
+    }
+
+    setState(() {
+      currentlyPlayingSong = song['songName'];
+      _isPlaying = true;
+    });
+    print('Şarkı çalınıyor: ${song['songName']}');
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -152,20 +206,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
                       ),
                     ),
                     onTap: () async {
-                      try {
-                        final audioUrl = song['songURL'] as String;
-                        await audioPlayer.setAudioSource(
-                            AudioSource.uri(Uri.parse(audioUrl)));
-                        await audioPlayer.play();
-                      } catch (error) {
-                        print('Hata oluştu: $error');
-                      }
-
-                      setState(() {
-                        currentlyPlayingSong = song['songName'];
-                        _isPlaying = true;
-                      });
-                      print('Şarkı çalınıyor: ${song['songName']}');
+                      await _playSong(song);
                     },
                   );
                 },
@@ -196,11 +237,11 @@ class _PlaylistPageState extends State<PlaylistPage> {
             children: [
               Text(
                 _printDuration(_currentPosition),
-                style: TextStyle(fontSize: 16.0),
+                style: const TextStyle(fontSize: 16.0),
               ),
               Text(
                 _printDuration(songDuration ?? Duration.zero),
-                style: TextStyle(fontSize: 16.0),
+                style: const TextStyle(fontSize: 16.0),
               ),
             ],
           ),
@@ -209,30 +250,39 @@ class _PlaylistPageState extends State<PlaylistPage> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             IconButton(
-              icon: Icon(Icons.skip_previous),
-              onPressed: () {
-                // Önceki şarkıya gitmek için gerekli kodu buraya ekleyin
+              icon: const Icon(Icons.skip_previous),
+              onPressed: () async {
+                await _playPreviousSong();
               },
               iconSize: 48.0,
             ),
-            IconButton(
-              icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow),
-              onPressed: () {
+            const SizedBox(width: 16.0),
+            GestureDetector(
+              onTap: () {
                 if (_isPlaying) {
                   audioPlayer.pause();
                 } else {
                   audioPlayer.play();
                 }
-                setState(() {
-                  _isPlaying = !_isPlaying;
-                });
               },
-              iconSize: 64.0,
+              child: Container(
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.blue,
+                ),
+                padding: const EdgeInsets.all(16.0),
+                child: Icon(
+                  _isPlaying ? Icons.pause : Icons.play_arrow,
+                  color: Colors.white,
+                  size: 48.0,
+                ),
+              ),
             ),
+            const SizedBox(width: 16.0),
             IconButton(
-              icon: Icon(Icons.skip_next),
-              onPressed: () {
-                // Sonraki şarkıya gitmek için gerekli kodu buraya ekleyin
+              icon: const Icon(Icons.skip_next),
+              onPressed: () async {
+                await _playNextSong();
               },
               iconSize: 48.0,
             ),
